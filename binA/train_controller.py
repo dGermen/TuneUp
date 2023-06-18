@@ -67,7 +67,8 @@ class train_controller():
               patience=10, 
               epochs = 1000, 
               test_active = False, 
-              save_path = None):
+              save_path = None,
+              save_name = None):
         
         if model == None:
             self.model = models.GCN(128)
@@ -90,6 +91,12 @@ class train_controller():
 
         if optimizer == None:
             optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, weight_decay=0.001)
+
+        if save_path == None:
+            save_path = "models/"
+
+        if save_name == None:
+            save_name = "model"
 
         # Define some initial best validation loss as infinity
         best_val_loss = float('inf')
