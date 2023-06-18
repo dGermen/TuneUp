@@ -1,6 +1,8 @@
 import torch
 import pickle   
 import numpy as np
+from torch_geometric.data import Data
+from torch_geometric.utils import degree
 
 def save_all(model, train_losses, val_losses, epoch, save_path):
   # save the model
