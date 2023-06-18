@@ -251,7 +251,7 @@ class train_controller():
                 # Clock time for look up and print it
                 start_node = int(start_node)
                 positive_pairs = self.start_node_dict_val[start_node] # THIS IS HARDCODED GLOBAL VARIABLE DO NOT COPY PASTE
-
+                positive_pairs = positive_pairs.to(device)
 
                 # Remove the existing edges in val_edges from all_possible_pairs to create the negative pairs
                 existing_pairs = positive_pairs.t()
