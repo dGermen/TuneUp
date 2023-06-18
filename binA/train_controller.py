@@ -221,13 +221,20 @@ class train_controller():
                 timezzz = time.time()
 
 
-                all_possible_pairs = torch.stack(torch.meshgrid(start_node, self.V), dim=-1).reshape(-1, 2).t().to(device)
-                all_possible_pairs = all_possible_pairs[:, torch.randint(all_possible_pairs.size(1), (neg_coef*valid_edges_in_V.size(1),))]
-
-                # Clock time for look up and print it
                 start_node = int(start_node)
                 positive_pairs = self.start_node_dict_val[start_node] # THIS IS HARDCODED GLOBAL VARIABLE DO NOT COPY PASTE
+                positive_pairs = positive_pairs.to(device)
 
+                neg_count = neg_coef*positive_pairs.size(1)
+
+                if neg_count > self.num_nodes:
+                    neg_count = neg_coef*80
+
+                all_possible_pairs = torch.stack(torch.meshgrid(torch.tensor(start_node), self.V), dim=-1).reshape(-1, 2).t().to(device)
+                all_possible_pairs = all_possible_pairs[:, torch.randint(all_possible_pairs.size(1), (neg_count,))]
+
+                # Clock time for look up and print it
+                
 
                 # Remove the existing edges in val_edges from all_possible_pairs to create the negative pairs
                 existing_pairs = positive_pairs.t()
@@ -343,15 +350,21 @@ class train_controller():
             a = time.time()
             for start_node in start_nodes:
                 timezzz = time.time()
-
-
-                all_possible_pairs = torch.stack(torch.meshgrid(start_node, self.V), dim=-1).reshape(-1, 2).t().to(device)
-                all_possible_pairs = all_possible_pairs[:, torch.randint(all_possible_pairs.size(1), (neg_coef*valid_edges_in_V.size(1),))]
-
+                
                 # Clock time for look up and print it
                 start_node = int(start_node)
                 positive_pairs = self.start_node_dict_val[start_node] # THIS IS HARDCODED GLOBAL VARIABLE DO NOT COPY PASTE
                 positive_pairs = positive_pairs.to(device)
+
+                neg_count = neg_coef*positive_pairs.size(1)
+
+                if neg_count > self.num_nodes:
+                    neg_count = neg_coef*80
+                
+
+                all_possible_pairs = torch.stack(torch.meshgrid(torch.tensor(start_node), self.V), dim=-1).reshape(-1, 2).t().to(device)
+                all_possible_pairs = all_possible_pairs[:, torch.randint(all_possible_pairs.size(1), (neg_count,))]
+
 
                 # Remove the existing edges in val_edges from all_possible_pairs to create the negative pairs
                 existing_pairs = positive_pairs.t()
