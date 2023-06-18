@@ -192,8 +192,8 @@ class train_controller():
         return val_loss.item()
     
     def test_transductive(self,z,model = None, nodes = None, val_edges = None, k=50):
-        model.eval()  # Set the model to evaluation mode
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # add this line to set the device
+        
+        
 
         # Take 5 samples from val_edges as positive examples
         if model == None:
@@ -205,7 +205,8 @@ class train_controller():
         if val_edges == None:
             val_edges = self.data_processor.E_val
 
-
+        model.eval()  # Set the model to evaluation mode
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # add this line to set the device
         with torch.no_grad():
 
             # Convert V to a boolean tensor for faster lookup.
