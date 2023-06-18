@@ -1,5 +1,6 @@
 import torch
-import pickle
+import pickle   
+import numpy as np
 
 def save_all(model, train_losses, val_losses, epoch, save_path):
   # save the model
@@ -99,3 +100,25 @@ def remove_common_edges(E_all, B):
   #print("B without intersection:")
   #print(B_without_intersection.cpu())
 
+
+
+
+def analyzer(recall_at_k, node_degrees):
+    # Assuming recall_at_k is a 2D array where each row contains [node_index, recall_value]
+    # Assuming node_degrees is an array where each element is the degree of the corresponding node
+    
+    # Find unique degrees
+    unique_degrees = np.unique(node_degrees)
+    
+    # Calculate average recalls for each unique degree using vectorized operations
+    sums = np.bincount(node_degrees, weights=recall_at_k[:, 1])
+    counts = np.bincount(node_degrees)
+    avg_recalls = sums / counts
+    
+    # Filter out NaN values (when counts is 0)
+    avg_recalls = avg_recalls[np.isfinite(avg_recalls)]
+    
+    # Stack unique_degrees and avg_recalls into a 2D array
+    degree_recall_array = np.column_stack((unique_degrees, avg_recalls))
+    
+    return degree_recall_array

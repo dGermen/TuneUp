@@ -1,5 +1,5 @@
 import torch
-import model
+import models
 from torch_geometric.utils import negative_sampling
 import numpy as np
 import random
@@ -70,7 +70,7 @@ class train_controller():
               save_path = None):
         
         if model == None:
-            self.model = model.GCN(128)
+            self.model = models.GCN(128)
         
         if V == None:
             V = self.V
