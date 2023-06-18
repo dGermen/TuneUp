@@ -340,7 +340,7 @@ class train_controller():
 
             # Tour over start nodes
             a = time.time()
-            for start_node in start_nodes:
+            for idx, start_node in enumerate(start_nodes):
                 timezzz = time.time()
 
 
@@ -374,8 +374,8 @@ class train_controller():
                 recall= calculate_recall_per_node(all_edges, all_scores, positive_edge_indicator, k,start_node)
                 # Report passed time
 
-                recall_at_k[start_node, 0] = start_node
-                recall_at_k[start_node, 1] = recall
+                recall_at_k[idx, 0] = start_node
+                recall_at_k[idx, 1] = recall
 
                 del all_possible_pairs
                 del all_scores
