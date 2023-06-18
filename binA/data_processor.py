@@ -25,6 +25,7 @@ class data_processor():
         self.edge_split()
 
         self.edge_validation()
+        self.node_degree()
         pass
 
     def download_data(self):
@@ -116,3 +117,9 @@ class data_processor():
             mask = valid_edges_in_V[0] == start_node
             edges = valid_edges_in_V[:, mask]
             self.start_node_dict_val[start_node] = edges
+
+    def node_degree(self):
+        self.node_degree = torch.zeros(self.num_nodes).to(self.device)
+        self.node_degree[self.data.edge_index[0, :]] += 1
+        self.node_degree[self.data.edge_index[1, :]] += 1
+        pass

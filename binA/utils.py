@@ -98,3 +98,4 @@ def remove_common_edges(E_all, B):
   #print(intersection.cpu())
   #print("B without intersection:")
   #print(B_without_intersection.cpu())
+

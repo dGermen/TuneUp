@@ -57,7 +57,35 @@ class train_controller():
             torch.backends.cudnn.benchmark = False
         
         
-    def train(self, model,V, data, train_edges, val_edges, optimizer, patience=10, epochs = 1000, test_active = True, save_path = None):
+    def train(self, 
+              model = None,
+              V = None, 
+              data = None, 
+              train_edges = None, 
+              val_edges = None, 
+              optimizer = None, 
+              patience=10, 
+              epochs = 1000, 
+              test_active = True, 
+              save_path = None):
+        
+        if model == None:
+            self.model = model.GCN(128)
+        
+        if V == None:
+            V = self.V
+        
+        if data == None:
+            data = self.data_processor.data
+
+        if train_edges == None:
+            train_edges = self.data_processor.E_train
+
+        if val_edges == None:
+            val_edges = self.data_processor.E_val
+
+        if optimizer == None:
+            optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.001)
 
         # Define some initial best validation loss as infinity
         best_val_loss = float('inf')
