@@ -90,7 +90,7 @@ class train_controller():
             val_edges = self.data_processor.E_val
 
         if optimizer == None:
-            optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, weight_decay=0.001)
+            optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001, weight_decay=0.001)
 
         if save_path == None:
             save_path = "models/"
