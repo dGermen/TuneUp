@@ -26,7 +26,11 @@ class train_controller():
 
         self.device = torch.device(preferred_device)
 
+        self.SEED = SEED
         self.seed(SEED)
+
+        self.V_percentage = V_percentage
+        self.train_edge_percentage = train_edge_percentage
 
         self.data_processor = data_processor.data_processor(self)
 

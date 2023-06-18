@@ -9,7 +9,7 @@ import random
 
 class data_processor():
 
-    def __init__(self, train_controller: train_controller.train_controller) -> None:
+    def __init__(self, train_controller) -> None:
         self.train_controller = train_controller
 
         self.SEED = self.train_controller.SEED
@@ -20,7 +20,9 @@ class data_processor():
 
         self.download_data()
         self.convert2torch()
+
         self.node_split()
+        self.edge_split()
 
         self.edge_validation()
         pass
@@ -37,7 +39,7 @@ class data_processor():
 
         self.dataset = OGB(ogb_dataset, transforms=[GCNFilter(), AdjToSpTensor()])
 
-    def covert2torch(self):
+    def convert2torch(self):
         # convert tf dataset to torch tensor
 
         # Get the node features, edge indices, and labels
