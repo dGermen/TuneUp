@@ -66,11 +66,15 @@ class train_controller():
               optimizer = None, 
               patience=10, 
               epochs = 1000, 
-              test_active = True, 
+              test_active = False, 
               save_path = None):
         
         if model == None:
             self.model = models.GCN(128)
+        else:
+            self.model = model
+
+        model = self.model
         
         if V == None:
             V = self.V
@@ -85,7 +89,7 @@ class train_controller():
             val_edges = self.data_processor.E_val
 
         if optimizer == None:
-            optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.001)
+            optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001, weight_decay=0.001)
 
         # Define some initial best validation loss as infinity
         best_val_loss = float('inf')
@@ -124,12 +128,12 @@ class train_controller():
             # Validation:
             if (epoch +1) % 5 == 0:
                 # validation function calls model.eval(), calculating both val loss & recall@50
-                val_loss = self.validation(model, V, val_edges, z_train)
+                val_loss = self.validation(model, z_train)
                 # append the val loss to the val_losses
                 val_losses.append(val_loss)
                 print(f'Validation Loss: {val_loss}')
                 if test_active:
-                    res = self.test_transductive(model, V, val_edges,z_train, 50)
+                    res = self.test_transductive(model, z_train)
                     print("recall@50: ", res)
 
                 """
@@ -153,8 +157,16 @@ class train_controller():
         save_all(model, train_losses, val_losses, epochs, save_path)
 
 
-    def validation(self,model, nodes, val_edges, z):
+    def validation(self,z,model =None, nodes =None, val_edges= None):
         #model.eval()  # Set the model to evaluation mode
+        if model == None:
+            model = self.model
+
+        if nodes == None:
+            nodes = self.V
+
+        if val_edges == None:
+            val_edges = self.data_processor.E_val
 
         with torch.no_grad():
 
@@ -172,11 +184,19 @@ class train_controller():
 
         return val_loss.item()
     
-    def test_transductive(self,model, nodes, val_edges, z, k=50):
+    def test_transductive(self,z,model = None, nodes = None, val_edges = None, k=50):
         model.eval()  # Set the model to evaluation mode
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # add this line to set the device
 
         # Take 5 samples from val_edges as positive examples
+        if model == None:
+            model = self.model
+
+        if nodes == None:
+            nodes = self.V
+
+        if val_edges == None:
+            val_edges = self.data_processor.E_val
 
 
         with torch.no_grad():
@@ -257,3 +277,159 @@ class train_controller():
                 del all_edges
 
             return recall, recall_at_k
+
+    def tune_up_wo_syn_tails(self, V, data, train_edges, val_edges, optimizer, num_epochs_train, num_epochs_finetune, test_active, save_path, save_name):
+
+        model = models.GCN(128).to(self.device)
+        # train the model
+        self.train(model, V, data, train_edges, val_edges, optimizer=optimizer, save_path = save_path, epochs=num_epochs_train, test_active=test_active, save_name= save_name)
+
+        # fine tune the model with  the same data
+        self.train(model, V, data, train_edges, val_edges, optimizer=optimizer, save_path = save_path, epochs=num_epochs_finetune, test_active=test_active, save_name= save_name)
+
+    def tune_up_wo_curriculum(self,V, data, train_edges, val_edges, optimizer, save_path, save_name, drop_percent=0.2, epochs = 1000, test_active = True):
+
+        # create a model instance:
+        model = models.GCN(128)
+
+        train_losses = []
+        val_losses = []
+
+        # Training loop
+        data, train_edges, val_edges = data.to(self.device), train_edges.to(self.device), val_edges.to(self.device)
+        for epoch in range(epochs):  # 1000 epochs
+            print("epoch ", epoch)
+
+            model.train()
+            optimizer.zero_grad()
+
+            # Stage 1: Train on the full graph
+            z_train_full = model(data, train_edges)  # embeddings for training edges on the full graph
+            pos_edge_index_full = train_edges  # positive examples on the full graph
+            neg_edge_index_full = negative_sampling(edge_index=pos_edge_index_full, num_nodes=z_train_full.size(0))  # negative examples
+            pos_logit_full = model.decode(z_train_full, pos_edge_index_full)
+            neg_logit_full = model.decode(z_train_full, neg_edge_index_full)
+            loss_full = models.bpr_loss(pos_logit_full, neg_logit_full) # calc loss
+            loss_full.backward() # backward pass
+            optimizer.step()
+
+
+            # Stage 2: Drop edges and train the graph with dropped edges
+            data_kept, _ = random_edge_sampler(data, drop_percent)
+            kept_edges = data_kept.edge_index.to(self.device)  # Fetching the edge index from the kept data
+
+            z_train_kept = model(data, kept_edges)  # embeddings for training edges on the graph with dropped edges
+            pos_edge_index_kept = train_edges  # positive examples on the graph with dropped edges
+            neg_edge_index_kept = negative_sampling(edge_index=pos_edge_index_kept, num_nodes=z_train_full.size(0))  # negative examples
+            pos_logit_kept = model.decode(z_train_kept, pos_edge_index_kept)
+            neg_logit_kept = model.decode(z_train_kept, neg_edge_index_kept)
+            loss_kept = models.bpr_loss(pos_logit_kept, neg_logit_kept) # calc loss
+            loss_kept.backward() # backward pass
+            optimizer.step()
+
+            train_loss = loss_full.item() + loss_kept.item()
+            print("train loss: ", train_loss)
+            train_losses.append(train_loss)
+
+            # Validation:
+            if (epoch +1) % 5 == 0:
+                # validation function calls model.eval(), calculating both val loss & recall@50
+                val_loss = self.validation(model, V, val_edges, z_train_full)
+                # append the val loss to the val_losses
+                val_losses.append(val_loss)
+                print(f'Validation Loss: {val_loss}')
+                if test_active:
+                    res = self.test(model, V, val_edges, z_train_full, 50)
+                    print("recall@50: ", res)    
+
+            # save the model @ each 200 epochs
+            if (epoch +1) % 100 == 0:
+                save_all(model, train_losses, val_losses, epoch +1, save_path, save_name)
+
+        # save @ exit
+        save_all(model, train_losses, val_losses, epochs, save_path, save_name)   
+
+    def tune_up_ours(self,model,  V, data, train_edges, val_edges, optimizer, num_epochs_finetune, test_active_finetune, save_path, save_name, drop_percent=0.2, epochs = 1000):
+        print("save_path::: ", save_path)
+        train_losses = []
+        val_losses = []
+        # Training loop
+        data, train_edges, val_edges = data.to(self.device), train_edges.to(self.device), val_edges.to(self.device)
+        for epoch in range(epochs):  # 1000 epochs
+            print("epoch ", epoch)
+
+            model.train()
+            optimizer.zero_grad()
+
+            # Drop edges from the graph
+            data_kept, _ = random_edge_sampler(data, drop_percent)
+            kept_edges = data_kept.edge_index.to(self.device)  # Fetching the edge index from the kept data
+
+            z_train = model(data, kept_edges)  # embeddings for training edges
+
+
+            pos_edge_index = train_edges  # positive examples
+            neg_edge_index = negative_sampling(edge_index=pos_edge_index, num_nodes=z_train.size(0))  # negative examples
+
+            pos_logit = model.decode(z_train, pos_edge_index)
+            neg_logit = model.decode(z_train, neg_edge_index)
+
+            loss = models.bpr_loss(pos_logit, neg_logit)
+            train_losses.append(loss)
+
+            loss.backward()
+            optimizer.step()
+
+            print("train loss: ", loss.item())
+
+
+
+            # Validation:
+            if (epoch +1) % 5 == 0:
+                # validation function calls model.eval(), calculating both val loss & recall@50
+                val_loss = self.validation(model, V, val_edges, z_train)
+                val_losses.append(val_loss)
+                # append the val loss to the val_losses
+                print(f'Validation Loss: {val_loss}')
+
+
+
+            # save the model @ each 200 epochs
+            if (epoch +1) % 100 == 0:
+                save_all(model, train_losses, val_losses, epoch +1, save_path, save_name)
+
+        # save @ exit
+        save_all(model, train_losses, val_losses, epochs, save_path, save_name)
+
+    def tuneup(self,mode, model,  V, data, train_edges, val_edges, optimizer, epochs, test_active, drop_percent, save_path, save_name, epochs_finetune):
+
+        if mode == "tuneup":
+            # tune_up_ours(model,  V, data, train_edges, val_edges, optimizer, num_epochs_finetune, test_active_finetune, save_path, save_name, drop_percent=0.2)
+            self.tune_up_ours(model,  V, data, train_edges, val_edges, optimizer, epochs, test_active, save_path, save_name, drop_percent=0.2)
+
+        elif mode == "wo_synt":
+            # tune_up_wo_syn_tails(V, data, train_edges, val_edges, optimizer, num_epochs_train, num_epochs_finetune, test_active, save_path, save_name)
+            self.tune_up_wo_syn_tails(V, data, train_edges, val_edges, optimizer, epochs, epochs_finetune, test_active, save_path, save_name)
+
+        elif mode == "wo_curr":
+            # tune_up_wo_curriculum(V, data, train_edges, val_edges, optimizer, save_path, save_name, drop_percent=0.2, epochs = 1000, test_active = True)
+            self.tune_up_wo_curriculum(V, data, train_edges, val_edges, optimizer, save_path, save_name, drop_percent=drop_percent, epochs = epochs, test_active = test_active)
+
+
+
+    def save_all(model, train_losses, val_losses, epoch, save_path, save_name):
+    
+        # save the model
+        model_save_path = save_path + "/" +save_name + "_model_"+str(epoch)+".pt"
+        print("model_save_path: ", model_save_path)
+        torch.save(model.state_dict(), model_save_path)
+
+        # save the train loss
+        trainloss_save_path = save_path + "/" +save_name + "_train_losses_" + str(epoch) + ".pkl"
+        with open(trainloss_save_path, 'wb') as f:
+            pickle.dump(train_losses, f)
+
+        # save the val loss
+        valloss_save_path = save_path + "/" +save_name + "_val_losses_" + str(epoch) + ".pkl"
+        with open(valloss_save_path, 'wb') as f:
+            pickle.dump(val_losses, f)    

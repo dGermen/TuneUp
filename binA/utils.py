@@ -122,3 +122,42 @@ def analyzer(recall_at_k, node_degrees):
     degree_recall_array = np.column_stack((unique_degrees, avg_recalls))
     
     return degree_recall_array
+
+def renormalize(edge_index, num_nodes):
+    # Convert to PyTorch tensor for calculation
+    edge_index = edge_index.clone().detach()
+
+    # Calculate degree and create Degree Matrix D
+    row, col = edge_index
+    deg = degree(row, num_nodes, dtype=edge_index.dtype)
+    deg_inv_sqrt = deg.pow(-0.5)
+    deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0)
+
+    # Renormalize
+    row, col = edge_index
+    edge_weight = deg_inv_sqrt[row] * deg_inv_sqrt[col]
+
+    return edge_index, edge_weight
+
+
+def random_edge_sampler(data, percent):
+    edge_index = data.edge_index
+    num_nodes = data.num_nodes
+
+    num_edges = edge_index.size(1)
+    perm = torch.randperm(num_edges)
+    preserve_nnz = int(num_edges * percent)
+
+    # Indices for kept edges
+    kept_indices = perm[:preserve_nnz]
+    kept_edges = edge_index[:, kept_indices]
+    kept_edges, kept_weights = renormalize(kept_edges, num_nodes)
+    data_kept = Data(edge_index=kept_edges, edge_attr=kept_weights)
+
+    # Indices for dropped edges
+    dropped_indices = perm[preserve_nnz:]
+    dropped_edges = edge_index[:, dropped_indices]
+    dropped_edges, dropped_weights = renormalize(dropped_edges, num_nodes)
+    data_dropped = Data(edge_index=dropped_edges, edge_attr=dropped_weights)
+
+    return data_kept, data_dropped
